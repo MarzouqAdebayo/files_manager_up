@@ -79,3 +79,55 @@ const postUpload: RequestHandler = async (req, res) => {
   }
 };
 
+const putPublish: RequestHandler = async (req, res) => {
+  const token = req.headers['x-token'];
+  if (!token || typeof token !== 'string') {
+    res.status(401).json({error: 'Unauthorized'});
+    return;
+  }
+  const userId = await redisClient.get(token);
+  if (!userId) {
+    res.status(401).json({error: 'Unauthorized'});
+    return;
+  }
+  const {id} = req.params;
+  const mongoObjectId = new ObjectId(id);
+  const updatedFile = await dbClient.fileCollection.findOneAndUpdate(
+    {_id: mongoObjectId},
+    {$set: {isPublic: true}},
+  );
+  if (!updatedFile) {
+    res.status(404).json({error: 'Not found'});
+    return;
+  }
+  updatedFile.isPublic = true;
+  res.status(200).json(updatedFile);
+};
+
+const putUnpublish: RequestHandler = async (req, res) => {
+  const token = req.headers['x-token'];
+  if (!token || typeof token !== 'string') {
+    res.status(401).json({error: 'Unauthorized'});
+    return;
+  }
+  const userId = await redisClient.get(token);
+  if (!userId) {
+    res.status(401).json({error: 'Unauthorized'});
+    return;
+  }
+  const {id} = req.params;
+  const mongoObjectId = new ObjectId(id);
+  const updatedFile = await dbClient.fileCollection.findOneAndUpdate(
+    {_id: mongoObjectId},
+    {$set: {isPublic: false}},
+  );
+  if (!updatedFile) {
+    res.status(404).json({error: 'Not found'});
+    return;
+  }
+  updatedFile.isPublic = false;
+  res.status(200).json(updatedFile);
+};
+
+
+export default {postUpload, putPublish, putUnpublish, getFile};
