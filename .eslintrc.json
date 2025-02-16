@@ -1,0 +1,6 @@
+{
+  "rules": {
+    "@typescript-eslint/no-unsafe-call": "error"
+  },
+  "extends": "./node_modules/gts/"
+}

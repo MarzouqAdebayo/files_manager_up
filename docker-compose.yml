@@ -1,0 +1,15 @@
+services:
+  redis:
+    image: 'redis:latest'
+    container_name: 'test_redis'
+    volumes:
+      - ./data:/data/redis
+    ports:
+      - '6379:6379'
+  mongo:
+    image: 'mongo:latest'
+    container_name: 'test_mongo'
+    volumes:
+      - ./data:/data/mongo
+    ports:
+      - '27017:27017'
