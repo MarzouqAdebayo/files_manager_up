@@ -21,6 +21,7 @@ const router = (app: Express) => {
   app.post('/users', UserController.postNew);
   app.get('/users/me', UserController.getMe);
 
+  app.post('/files', FilesController.postUpload);
 };
 
 export default router;
