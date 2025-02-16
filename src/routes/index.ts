@@ -14,6 +14,7 @@ import FilesController from '../controllers/FilesController';
 const router = (app: Express) => {
   app.get('/status', AppController.getStatus);
   app.get('/stats', AppController.getStats);
+  app.post('/users', UserController.postNew);
 };
 
 export default router;
