@@ -129,5 +129,48 @@ const putUnpublish: RequestHandler = async (req, res) => {
   res.status(200).json(updatedFile);
 };
 
+const getFile: RequestHandler = async (req, res) => {
+  const {id} = req.params;
+  const {size} = req.query;
+  const mongoObjectId = new ObjectId(id);
+  const file = await dbClient.fileCollection.findOne({_id: mongoObjectId});
+  if (!file) {
+    res.status(404).json({error: 'Not found'});
+    return;
+  }
+  if (!file.isPublic) {
+    const token = req.headers['x-token'];
+    if (!token || typeof token !== 'string') {
+      res.status(401).json({error: 'Unauthorized'});
+      return;
+    }
+    const userId = await redisClient.get(token);
+    if (!userId) {
+      res.status(404).json({error: 'Unauthorized'});
+      return;
+    }
+    if (userId !== file.userId) {
+      res.status(404).json({error: 'Not found'});
+      return;
+    }
+  }
+  if (file.type === FileType.Folder) {
+    res.status(400).json({error: "A folder doesn't have content"});
+    return;
+  }
+  let localPath = file.localPath;
+  if (size) {
+    localPath = `${localPath}_${size}`;
+  }
+  if (!(await pathExists(localPath))) {
+    res.status(404).json({error: 'Not found'});
+    return;
+  }
+  const decodedfileData = await fs.readFile(localPath);
+  const contents = Buffer.from(decodedfileData.toString('binary'), 'base64');
+  const mimeType = mime.lookup(file.name);
+  res.type(mimeType || 'text/plain');
+  res.status(200).end(contents);
+};
 
 export default {postUpload, putPublish, putUnpublish, getFile};

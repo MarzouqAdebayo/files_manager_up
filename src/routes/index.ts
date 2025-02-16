@@ -24,6 +24,7 @@ const router = (app: Express) => {
   app.post('/files', FilesController.postUpload);
   app.put('/files/:id/publish', FilesController.putPublish);
   app.put('/files/:id/unpublish', FilesController.putUnpublish);
+  app.get('/files/:id/data', FilesController.getFile);
 };
 
 export default router;
