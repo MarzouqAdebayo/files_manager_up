@@ -3,6 +3,8 @@ import {dbClient} from '../utils/db';
 import * as argon from 'argon2';
 import {redisClient} from '../utils/redis';
 import {ObjectId} from 'mongodb';
+import {sendWelcomeEmailQueue} from '../email-worker';
+
 const postNew: RequestHandler = async (req, res) => {
   const {email, password} = req.body;
   if (!email) {
@@ -24,6 +26,31 @@ const postNew: RequestHandler = async (req, res) => {
     password: hashedPassword,
   });
   res.status(200).json({id: createdUser.insertedId, email});
+  void sendWelcomeEmailQueue.add({recipients: email});
+};
+
+const getMe: RequestHandler = async (req, res) => {
+  const token = req.headers['x-token'];
+  if (!token || typeof token !== 'string') {
+    res.status(401).json({error: 'Unauthorized'});
+    return;
+  }
+  const userId = await redisClient.get(token);
+  if (!userId) {
+    res.status(401).json({error: 'Unauthorized'});
+    return;
+  }
+  const mongoObjectId = new ObjectId(userId);
+  const userExists = await dbClient.userCollection.findOne({
+    _id: mongoObjectId,
+  });
+  if (!userExists) {
+    res.status(401).json({error: 'Unauthorized'});
+    return;
+  }
+  res
+    .status(200)
+    .json({id: userExists._id.toString(), email: userExists.email});
 };
 
 export default {postNew, getMe};
