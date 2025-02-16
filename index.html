@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Download or Display File</title>
+    <script>
+      async function handleFile() {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const fileId = document.getElementById('file_id').value;
+        const action = document.querySelector(
+          'input[name="action"]:checked',
+        ).value;
+        const imageSize = document.getElementById('imageSize').value;
+
+        if (!username || !password) {
+          alert('Please enter both username and password.');
+          return;
+        }
+
+        let url = `http://localhost:5000/files/${fileId}/data`;
+        const headers = new Headers();
+        headers.append(
+          'Authorization',
+          'Basic ' + btoa(username + ':' + password),
+        );
+        if (imageSize) {
+          url += `?size=${imageSize}`;
+        }
+
+        try {
+          const response = await fetch(url, {
+            method: 'GET',
+            headers,
+          });
+
+          if (!response.ok) {
+            throw new Error(`Error: ${response.status} ${response.statusText}`);
+          }
+
+          const blob = await response.blob();
+          const fileType = blob.type;
+          console.log(blob);
+
+          if (action === 'display') {
+            displayFile(blob, fileType);
+          } else {
+            downloadFile(blob);
+          }
+        } catch (error) {
+          console.error('File handling failed:', error);
+          alert('Failed to retrieve file.');
+        }
+      }
+
+      function displayFile(blob, fileType) {
+        const fileURL = URL.createObjectURL(blob);
+        const fileContainer = document.getElementById('file-container');
+        fileContainer.innerHTML = ''; // Clear previous content
+
+        if (fileType.startsWith('image/')) {
+          // Display Image
+          const img = document.createElement('img');
+          img.src = fileURL;
+          img.style.maxWidth = '100%';
+          fileContainer.appendChild(img);
+        } else if (fileType === 'application/pdf') {
+          // Display PDF
+          const iframe = document.createElement('iframe');
+          iframe.src = fileURL;
+          iframe.style.width = '100%';
+          iframe.style.height = '500px';
+          fileContainer.appendChild(iframe);
+        } else if (fileType.startsWith('text/')) {
+          // Display Text File
+          fetch(fileURL)
+            .then(response => response.text())
+            .then(text => {
+              const pre = document.createElement('pre');
+              pre.textContent = text;
+              fileContainer.appendChild(pre);
+            });
+        } else {
+          alert('Unsupported file type for display. Downloading instead.');
+          downloadFile(blob);
+        }
+      }
+
+      function downloadFile(blob) {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'downloaded-file'; // Change filename if necessary
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    </script>
+  </head>
+  <body>
+    <h2>Download or Display File with Basic Auth</h2>
+    <label>Username: <input type="text" id="username" /></label>
+    <br />
+    <label>Password: <input type="password" id="password" /></label>
+    <br />
+    <label>File Id: <input type="text" id="file_id" /></label>
+    <br />
+    <label>
+      <input type="radio" name="action" value="display" checked /> Display File
+    </label>
+    <label>
+      <input type="radio" name="action" value="download" /> Download File
+    </label>
+    <br />
+    <label for="imageSize">Image Size:</label>
+    <select id="imageSize">
+      <option value="">Original</option>
+      <option value="500">500px</option>
+      <option value="250">250px</option>
+      <option value="100">100px</option>
+    </select>
+    <br />
+    <button onclick="handleFile()">Fetch File</button>
+
+    <h3>File Preview:</h3>
+    <div id="file-container" style="margin-top: 10px"></div>
+  </body>
+</html>
