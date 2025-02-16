@@ -5,11 +5,16 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import {v4 as uuidv4} from 'uuid';
 import {ObjectId} from 'mongodb';
+import * as mime from 'mime-types';
 import {pathExists} from '../utils/fileUtils';
+import {thumbnailGeneratorQueue} from '../image-worker';
+
 enum FileType {
   Folder = 'folder',
   File = 'file',
   Image = 'image',
+}
+
 const postUpload: RequestHandler = async (req, res) => {
   const token = req.headers['x-token'];
   if (!token || typeof token !== 'string') {
@@ -73,6 +78,9 @@ const postUpload: RequestHandler = async (req, res) => {
     doc.localPath = filepath;
     const newFile = await dbClient.fileCollection.insertOne(doc);
     res.status(201).json(doc);
+    if (doc.type === FileType.Image) {
+      void thumbnailGeneratorQueue.add({fileId: newFile.insertedId, userId});
+    }
   } catch (error) {
     console.log(error);
     res.status(500).json({error: 'internal server error'});
