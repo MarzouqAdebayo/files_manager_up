@@ -1,25 +1,35 @@
 import * as Queue from 'bull';
 import * as dotenv from 'dotenv';
+import {dbClient} from './utils/db';
+import getIdObject from './utils/getIdObject';
 
 // Loading env vars
 dotenv.config();
 
 async function processWelcomeEmail(
-  {recipients}: {recipients: string[] | string},
+  data: {userId: string},
   done: Queue.DoneCallback,
 ) {
-  if (Array.isArray(recipients)) {
-    for (const recipient of recipients) {
-      console.log('Sent welcome email to: ', recipient);
-    }
-  } else {
-    console.log('Sent welcome email to: ', recipients);
+  if (!data.userId) {
+    done(new Error('Missing userId'));
   }
-  done(null, 'Email sent');
+  const mongoObjectId = getIdObject(data!.userId);
+  if (!mongoObjectId) {
+    done(new Error('Invalid user id'));
+  }
+  const user = await dbClient.fileCollection.findOne({
+    _id: mongoObjectId!,
+  });
+  if (!user) {
+    done(new Error('User not found'));
+  }
+  console.log(user);
+  console.log(`Welcome ${user!.email}!`);
+  done(null, 'success');
 }
 
 const sendWelcomeEmailQueue = Queue(
-  'thumbnail generator',
+  'send email',
   `redis://${process.env.HOST || '127.0.0.1'}:${process.env.PORT || '6379'}`,
 );
 void sendWelcomeEmailQueue

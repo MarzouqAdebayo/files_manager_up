@@ -76,7 +76,7 @@ async function processImageThumbnail(
 }
 
 const thumbnailGeneratorQueue = Queue(
-  'thumbnail generator',
+  'generate thumbnail',
   `redis://${process.env.HOST || '127.0.0.1'}:${process.env.PORT || '6379'}`,
 );
 void thumbnailGeneratorQueue

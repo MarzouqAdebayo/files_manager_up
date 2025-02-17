@@ -3,7 +3,7 @@ import {dbClient} from '../utils/db';
 import * as argon from 'argon2';
 import {v4 as uuidv4} from 'uuid';
 import {redisClient} from '../utils/redis';
-import {ObjectId} from 'mongodb';
+import getIdObject from '../utils/getIdObject';
 
 const getConnect: RequestHandler = async (req, res) => {
   const authHeader = req.headers.authorization;
@@ -27,6 +27,13 @@ const getConnect: RequestHandler = async (req, res) => {
   const cache_key = `auth_${token}`;
   const lifetime = 24 * 60 * 60;
   await redisClient.set(cache_key, userExists._id.toString(), lifetime);
+  res.cookie('token', `auth_${token}`, {
+    maxAge: lifetime || 3600000,
+    sameSite: 'lax',
+    httpOnly: true,
+    secure: false,
+    priority: 'high',
+  });
   res.status(200).json({token: token});
 };
 
@@ -41,7 +48,11 @@ const getDisconnect: RequestHandler = async (req, res) => {
     res.status(401).json({error: 'Unauthorized'});
     return;
   }
-  const mongoObjectId = new ObjectId(userId);
+  const mongoObjectId = getIdObject(userId);
+  if (!mongoObjectId) {
+    res.status(400).json({error: 'Invalid user id'});
+    return;
+  }
   const userExists = await dbClient.userCollection.findOne({
     _id: mongoObjectId,
   });
@@ -50,6 +61,7 @@ const getDisconnect: RequestHandler = async (req, res) => {
     return;
   }
   await redisClient.remove(token);
+  res.clearCookie('token');
   res.status(204);
 };
 

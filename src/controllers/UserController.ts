@@ -2,8 +2,8 @@ import {RequestHandler} from 'express';
 import {dbClient} from '../utils/db';
 import * as argon from 'argon2';
 import {redisClient} from '../utils/redis';
-import {ObjectId} from 'mongodb';
 import {sendWelcomeEmailQueue} from '../email-worker';
+import getIdObject from '../utils/getIdObject';
 
 const postNew: RequestHandler = async (req, res) => {
   const {email, password} = req.body;
@@ -30,7 +30,7 @@ const postNew: RequestHandler = async (req, res) => {
 };
 
 const getMe: RequestHandler = async (req, res) => {
-  const token = req.headers['x-token'];
+  const token = req.headers['x-token'] || req.cookies['token'];
   if (!token || typeof token !== 'string') {
     res.status(401).json({error: 'Unauthorized'});
     return;
@@ -40,7 +40,11 @@ const getMe: RequestHandler = async (req, res) => {
     res.status(401).json({error: 'Unauthorized'});
     return;
   }
-  const mongoObjectId = new ObjectId(userId);
+  const mongoObjectId = getIdObject(userId);
+  if (!mongoObjectId) {
+    res.status(404).json({error: 'Invalid user id'});
+    return;
+  }
   const userExists = await dbClient.userCollection.findOne({
     _id: mongoObjectId,
   });

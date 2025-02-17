@@ -4,10 +4,10 @@ import {dbClient} from '../utils/db';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import {v4 as uuidv4} from 'uuid';
-import {ObjectId} from 'mongodb';
 import * as mime from 'mime-types';
 import {pathExists} from '../utils/fileUtils';
 import {thumbnailGeneratorQueue} from '../image-worker';
+import getIdObject from '../utils/getIdObject';
 
 enum FileType {
   Folder = 'folder',
@@ -16,7 +16,7 @@ enum FileType {
 }
 
 const postUpload: RequestHandler = async (req, res) => {
-  const token = req.headers['x-token'];
+  const token = req.headers['x-token'] || req.cookies['token'];
   if (!token || typeof token !== 'string') {
     res.status(401).json({error: 'Unauthorized'});
     return;
@@ -40,8 +40,13 @@ const postUpload: RequestHandler = async (req, res) => {
     return;
   }
   if (parentId) {
+    const mongoObjectId = getIdObject(parentId);
+    if (!mongoObjectId) {
+      res.status(400).json({error: 'Invalid parent id'});
+      return;
+    }
     const parentFolder = await dbClient.fileCollection.findOne({
-      id: parentId,
+      _id: mongoObjectId,
     });
     if (!parentFolder) {
       res.status(400).json({error: 'Parent not found'});
@@ -99,7 +104,11 @@ const putPublish: RequestHandler = async (req, res) => {
     return;
   }
   const {id} = req.params;
-  const mongoObjectId = new ObjectId(id);
+  const mongoObjectId = getIdObject(id);
+  if (!mongoObjectId) {
+    res.status(404).json({error: 'Unauthorized'});
+    return;
+  }
   const updatedFile = await dbClient.fileCollection.findOneAndUpdate(
     {_id: mongoObjectId},
     {$set: {isPublic: true}},
@@ -124,7 +133,11 @@ const putUnpublish: RequestHandler = async (req, res) => {
     return;
   }
   const {id} = req.params;
-  const mongoObjectId = new ObjectId(id);
+  const mongoObjectId = getIdObject(id);
+  if (!mongoObjectId) {
+    res.status(404).json({error: 'Invalid file id'});
+    return;
+  }
   const updatedFile = await dbClient.fileCollection.findOneAndUpdate(
     {_id: mongoObjectId},
     {$set: {isPublic: false}},
@@ -140,14 +153,18 @@ const putUnpublish: RequestHandler = async (req, res) => {
 const getFile: RequestHandler = async (req, res) => {
   const {id} = req.params;
   const {size} = req.query;
-  const mongoObjectId = new ObjectId(id);
+  const mongoObjectId = getIdObject(id);
+  if (!mongoObjectId) {
+    res.status(404).json({error: 'Invalid file id'});
+    return;
+  }
   const file = await dbClient.fileCollection.findOne({_id: mongoObjectId});
   if (!file) {
-    res.status(404).json({error: 'Not found'});
+    res.status(404).json({error: 'Invalid file id'});
     return;
   }
   if (!file.isPublic) {
-    const token = req.headers['x-token'];
+    const token = req.headers['x-token'] || req.cookies['token'];
     if (!token || typeof token !== 'string') {
       res.status(401).json({error: 'Unauthorized'});
       return;
