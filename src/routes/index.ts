@@ -3,8 +3,6 @@
  * It sets up the endpoints for 'status' and 'stats' using the methods
  * from the `AppController` to handle the respective requests.
  */
-//import AppController from '../controllers/AppController';
-
 import {Express} from 'express';
 import AppController from '../controllers/AppController';
 import UserController from '../controllers/UserController';
@@ -22,6 +20,8 @@ const router = (app: Express) => {
   app.get('/users/me', UserController.getMe);
 
   app.post('/files', FilesController.postUpload);
+  app.get('/files/:id', AuthController.authMiddleware, FilesController.getShow);
+  app.get('/files', AuthController.authMiddleware, FilesController.getIndex);
   app.put('/files/:id/publish', FilesController.putPublish);
   app.put('/files/:id/unpublish', FilesController.putUnpublish);
   app.get('/files/:id/data', FilesController.getFile);

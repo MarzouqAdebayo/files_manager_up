@@ -92,6 +92,57 @@ const postUpload: RequestHandler = async (req, res) => {
   }
 };
 
+const getShow: RequestHandler = async (req, res) => {
+  const token = req.headers['x-token'] || req.cookies['token'];
+  if (!token || typeof token !== 'string') {
+    res.status(401).json({error: 'Unauthorized'});
+    return;
+  }
+  const userId = await redisClient.get(token);
+  if (!userId) {
+    res.status(404).json({error: 'Unauthorized'});
+    return;
+  }
+  const {id: fileId} = req.params;
+  const mongoObjectId = getIdObject(fileId);
+  if (!mongoObjectId) {
+    res.status(404).json({error: 'Invalid file id'});
+    return;
+  }
+  const file = await dbClient.fileCollection.findOne({
+    _id: mongoObjectId,
+    userId,
+  });
+  if (!file) {
+    res.status(404).json({error: 'Not found'});
+    return;
+  }
+  if (file.type === FileType.Folder) {
+    res.status(400).json({error: "A folder doesn't have content"});
+    return;
+  }
+  res.status(200).end(file);
+};
+
+const getIndex: RequestHandler = async (req, res) => {
+  const userId = res.locals.user.id as string;
+  const {parentId = 0, page = 1} = req.query;
+  const pageToInt = typeof page === 'string' && parseInt(page);
+  const parsedPage = pageToInt || 1;
+  const limit = 40;
+  const skip = (parsedPage - 1) * limit;
+  const files = await dbClient.fileCollection
+    .find(
+      {
+        parentId,
+        userId,
+      },
+      {limit, skip},
+    )
+    .toArray();
+  res.status(200).json(files);
+};
+
 const putPublish: RequestHandler = async (req, res) => {
   const token = req.headers['x-token'];
   if (!token || typeof token !== 'string') {
@@ -164,7 +215,8 @@ const getFile: RequestHandler = async (req, res) => {
     return;
   }
   if (!file.isPublic) {
-    const token = req.headers['x-token'] || req.cookies['token'];
+    const token = req.cookies['token'] || req.headers['x-token'];
+    console.log('token: ', token);
     if (!token || typeof token !== 'string') {
       res.status(401).json({error: 'Unauthorized'});
       return;
@@ -198,4 +250,11 @@ const getFile: RequestHandler = async (req, res) => {
   res.status(200).end(contents);
 };
 
-export default {postUpload, putPublish, putUnpublish, getFile};
+export default {
+  postUpload,
+  getShow,
+  getIndex,
+  putPublish,
+  putUnpublish,
+  getFile,
+};

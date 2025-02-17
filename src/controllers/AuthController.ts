@@ -25,7 +25,7 @@ const getConnect: RequestHandler = async (req, res) => {
   }
   const token = uuidv4();
   const cache_key = `auth_${token}`;
-  const lifetime = 24 * 60 * 60;
+  const lifetime = 24 * 60 * 60 * 1000;
   await redisClient.set(cache_key, userExists._id.toString(), lifetime);
   res.cookie('token', `auth_${token}`, {
     maxAge: lifetime || 3600000,
@@ -65,4 +65,19 @@ const getDisconnect: RequestHandler = async (req, res) => {
   res.status(204);
 };
 
-export default {getConnect, getDisconnect};
+const authMiddleware: RequestHandler = async (req, res, next) => {
+  const token = req.headers['x-token'] || req.cookies['token'];
+  if (!token || typeof token !== 'string') {
+    res.status(401).json({error: 'Unauthorized'});
+    return;
+  }
+  const userId = await redisClient.get(token);
+  if (!userId) {
+    res.status(404).json({error: 'Unauthorized'});
+    return;
+  }
+  res.locals.user = {id: userId};
+  next();
+};
+
+export default {getConnect, getDisconnect, authMiddleware};
