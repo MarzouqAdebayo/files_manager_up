@@ -14,16 +14,28 @@ const router = (app: Express) => {
   app.get('/stats', AppController.getStats);
 
   app.get('/connect', AuthController.getConnect);
-  app.get('/disconnect', AuthController.getDisconnect);
+  app.get(
+    '/disconnect',
+    AuthController.authMiddleware,
+    AuthController.getDisconnect,
+  );
 
   app.post('/users', UserController.postNew);
-  app.get('/users/me', UserController.getMe);
+  app.get('/users/me', AuthController.authMiddleware, UserController.getMe);
 
-  app.post('/files', FilesController.postUpload);
+  app.post('/files', AuthController.authMiddleware, FilesController.postUpload);
   app.get('/files/:id', AuthController.authMiddleware, FilesController.getShow);
   app.get('/files', AuthController.authMiddleware, FilesController.getIndex);
-  app.put('/files/:id/publish', FilesController.putPublish);
-  app.put('/files/:id/unpublish', FilesController.putUnpublish);
+  app.put(
+    '/files/:id/publish',
+    AuthController.authMiddleware,
+    FilesController.putPublish,
+  );
+  app.put(
+    '/files/:id/unpublish',
+    AuthController.authMiddleware,
+    FilesController.putUnpublish,
+  );
   app.get('/files/:id/data', FilesController.getFile);
 };
 

@@ -8,6 +8,7 @@ import * as mime from 'mime-types';
 import {pathExists} from '../utils/fileUtils';
 import {thumbnailGeneratorQueue} from '../image-worker';
 import getIdObject from '../utils/getIdObject';
+import {saveBase64File} from '../utils/base64Utils';
 
 enum FileType {
   Folder = 'folder',
@@ -16,16 +17,7 @@ enum FileType {
 }
 
 const postUpload: RequestHandler = async (req, res) => {
-  const token = req.headers['x-token'] || req.cookies['token'];
-  if (!token || typeof token !== 'string') {
-    res.status(401).json({error: 'Unauthorized'});
-    return;
-  }
-  const userId = await redisClient.get(token);
-  if (!userId) {
-    res.status(401).json({error: 'Unauthorized'});
-    return;
-  }
+  const userId = res.locals.user.id as string;
   const {name, type, parentId = 0, isPublic = false, data} = req.body;
   if (!name) {
     res.status(400).json({error: 'Missing name'});
@@ -79,7 +71,7 @@ const postUpload: RequestHandler = async (req, res) => {
   }
   try {
     const filepath = path.join(dirPath, uuidv4());
-    await fs.writeFile(filepath, data);
+    await saveBase64File(data, filepath);
     doc.localPath = filepath;
     const newFile = await dbClient.fileCollection.insertOne(doc);
     res.status(201).json(doc);
@@ -144,16 +136,7 @@ const getIndex: RequestHandler = async (req, res) => {
 };
 
 const putPublish: RequestHandler = async (req, res) => {
-  const token = req.headers['x-token'];
-  if (!token || typeof token !== 'string') {
-    res.status(401).json({error: 'Unauthorized'});
-    return;
-  }
-  const userId = await redisClient.get(token);
-  if (!userId) {
-    res.status(401).json({error: 'Unauthorized'});
-    return;
-  }
+  const userId = res.locals.user.id as string;
   const {id} = req.params;
   const mongoObjectId = getIdObject(id);
   if (!mongoObjectId) {
@@ -161,7 +144,7 @@ const putPublish: RequestHandler = async (req, res) => {
     return;
   }
   const updatedFile = await dbClient.fileCollection.findOneAndUpdate(
-    {_id: mongoObjectId},
+    {_id: mongoObjectId, userId},
     {$set: {isPublic: true}},
   );
   if (!updatedFile) {
@@ -173,16 +156,7 @@ const putPublish: RequestHandler = async (req, res) => {
 };
 
 const putUnpublish: RequestHandler = async (req, res) => {
-  const token = req.headers['x-token'];
-  if (!token || typeof token !== 'string') {
-    res.status(401).json({error: 'Unauthorized'});
-    return;
-  }
-  const userId = await redisClient.get(token);
-  if (!userId) {
-    res.status(401).json({error: 'Unauthorized'});
-    return;
-  }
+  const userId = res.locals.user.id as string;
   const {id} = req.params;
   const mongoObjectId = getIdObject(id);
   if (!mongoObjectId) {
@@ -190,7 +164,7 @@ const putUnpublish: RequestHandler = async (req, res) => {
     return;
   }
   const updatedFile = await dbClient.fileCollection.findOneAndUpdate(
-    {_id: mongoObjectId},
+    {_id: mongoObjectId, userId},
     {$set: {isPublic: false}},
   );
   if (!updatedFile) {
@@ -216,7 +190,6 @@ const getFile: RequestHandler = async (req, res) => {
   }
   if (!file.isPublic) {
     const token = req.cookies['token'] || req.headers['x-token'];
-    console.log('token: ', token);
     if (!token || typeof token !== 'string') {
       res.status(401).json({error: 'Unauthorized'});
       return;

@@ -38,16 +38,8 @@ const getConnect: RequestHandler = async (req, res) => {
 };
 
 const getDisconnect: RequestHandler = async (req, res) => {
-  const token = req.headers['x-token'];
-  if (!token || typeof token !== 'string') {
-    res.status(401).json({error: 'Unauthorized'});
-    return;
-  }
-  const userId = await redisClient.get(token);
-  if (!userId) {
-    res.status(401).json({error: 'Unauthorized'});
-    return;
-  }
+  const userId = res.locals.user.id as string;
+  const token = res.locals.user.token as string;
   const mongoObjectId = getIdObject(userId);
   if (!mongoObjectId) {
     res.status(400).json({error: 'Invalid user id'});
@@ -76,7 +68,7 @@ const authMiddleware: RequestHandler = async (req, res, next) => {
     res.status(404).json({error: 'Unauthorized'});
     return;
   }
-  res.locals.user = {id: userId};
+  res.locals.user = {id: userId, token};
   next();
 };
 
