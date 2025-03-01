@@ -31,7 +31,6 @@ else:
     token = token.split("\n")[0]
     print(token)
 
-print("auth token: ", token)
 if not token:
     print("You are not authenticated, please run the login script to authenticate")
     sys.exit(1)
