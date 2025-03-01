@@ -2,24 +2,21 @@ import * as Queue from 'bull';
 import * as imageThumbnail from 'image-thumbnail';
 import {ObjectId} from 'mongodb';
 import {dbClient} from './utils/db';
-import * as fs from 'fs/promises';
+import {saveBase64File} from './utils/base64Utils';
 
 const defaultOptions = {failOnError: true, responseType: 'base64'} as const;
 const thumbnailOptions = [{width: 500}, {width: 250}, {width: 100}];
 
 async function generateThumbnail(
-  base64String: string,
-  metadata: {
-    filepath: string;
-  },
+  filepath: string,
   options?: {
     responseType: 'base64';
   } & imageThumbnail.Options,
 ) {
   console.log('Generating Thumbnail...');
   try {
-    const thumbnail = await imageThumbnail(base64String, options);
-    await fs.writeFile(`${metadata.filepath}_${options?.width}`, thumbnail);
+    const base64String = await imageThumbnail(filepath, options);
+    await saveBase64File(base64String, `${filepath}_${options?.width}`);
     return 'success';
   } catch (err) {
     console.error(err);
@@ -40,9 +37,11 @@ async function processImageThumbnail(
   console.log('In job, ', fileId, ' ', userId);
   if (!fileId) {
     done(new Error('Missing fileId'));
+    return;
   }
   if (!userId) {
     done(new Error('Missing userId'));
+    return;
   }
   const mongoObjectId = new ObjectId(fileId);
   const fileData = await dbClient.fileCollection.findOne({
@@ -51,22 +50,11 @@ async function processImageThumbnail(
   });
   if (!fileData) {
     done(new Error('File not found'));
-  }
-  let contents = '';
-  try {
-    const decodedfileData = await fs.readFile(fileData!.localPath);
-    contents = decodedfileData.toString();
-  } catch (error) {
-    console.log('file read error!!!  ', error);
-    done(error as Error);
+    return;
   }
   const options = thumbnailOptions.map(
     opts => () =>
-      generateThumbnail(
-        contents,
-        {filepath: fileData!.localPath},
-        {...defaultOptions, ...opts},
-      ),
+      generateThumbnail(fileData!.localPath, {...defaultOptions, ...opts}),
   );
   console.log(options);
   const result = await Promise.all(options.map(task => task()));

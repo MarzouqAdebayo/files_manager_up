@@ -7,23 +7,25 @@ import getIdObject from './utils/getIdObject';
 dotenv.config();
 
 async function processWelcomeEmail(
-  data: {userId: string},
+  data: {userId: string; email: string},
   done: Queue.DoneCallback,
 ) {
   if (!data.userId) {
     done(new Error('Missing userId'));
+    return;
   }
   const mongoObjectId = getIdObject(data!.userId);
   if (!mongoObjectId) {
     done(new Error('Invalid user id'));
+    return;
   }
-  const user = await dbClient.fileCollection.findOne({
+  const user = await dbClient.userCollection.findOne({
     _id: mongoObjectId!,
   });
   if (!user) {
     done(new Error('User not found'));
+    return;
   }
-  console.log(user);
   console.log(`Welcome ${user!.email}!`);
   done(null, 'success');
 }
