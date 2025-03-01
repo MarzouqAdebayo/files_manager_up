@@ -26,7 +26,7 @@ const postNew: RequestHandler = async (req, res) => {
     password: hashedPassword,
   });
   res.status(200).json({id: createdUser.insertedId, email});
-  void sendWelcomeEmailQueue.add({recipients: email});
+  void sendWelcomeEmailQueue.add({userId: createdUser.insertedId, email});
 };
 
 const getMe: RequestHandler = async (req, res) => {

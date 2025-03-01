@@ -58,8 +58,8 @@ const postUpload: RequestHandler = async (req, res) => {
     localPath: '',
   };
   if (type === FileType.Folder) {
-    await dbClient.fileCollection.insertOne(doc);
-    res.status(201).json(doc);
+    const folder = await dbClient.fileCollection.insertOne(doc);
+    res.status(201).json({...doc, id: folder.insertedId.toString()});
     return;
   }
   const dirPath = path.join(
@@ -74,9 +74,12 @@ const postUpload: RequestHandler = async (req, res) => {
     await saveBase64File(data, filepath);
     doc.localPath = filepath;
     const newFile = await dbClient.fileCollection.insertOne(doc);
-    res.status(201).json(doc);
+    res.status(201).json({...doc, id: newFile.insertedId.toString()});
     if (doc.type === FileType.Image) {
-      void thumbnailGeneratorQueue.add({fileId: newFile.insertedId, userId});
+      void thumbnailGeneratorQueue.add({
+        fileId: newFile.insertedId.toString(),
+        userId,
+      });
     }
   } catch (error) {
     console.log(error);
@@ -85,16 +88,7 @@ const postUpload: RequestHandler = async (req, res) => {
 };
 
 const getShow: RequestHandler = async (req, res) => {
-  const token = req.headers['x-token'] || req.cookies['token'];
-  if (!token || typeof token !== 'string') {
-    res.status(401).json({error: 'Unauthorized'});
-    return;
-  }
-  const userId = await redisClient.get(token);
-  if (!userId) {
-    res.status(404).json({error: 'Unauthorized'});
-    return;
-  }
+  const userId = res.locals.user.id as string;
   const {id: fileId} = req.params;
   const mongoObjectId = getIdObject(fileId);
   if (!mongoObjectId) {
@@ -113,16 +107,16 @@ const getShow: RequestHandler = async (req, res) => {
     res.status(400).json({error: "A folder doesn't have content"});
     return;
   }
-  res.status(200).end(file);
+  res.status(200).json(file);
 };
 
 const getIndex: RequestHandler = async (req, res) => {
   const userId = res.locals.user.id as string;
   const {parentId = 0, page = 1} = req.query;
-  const pageToInt = typeof page === 'string' && parseInt(page);
-  const parsedPage = pageToInt || 1;
-  const limit = 40;
-  const skip = (parsedPage - 1) * limit;
+  const pageToInt =
+    typeof page === 'string' && parseInt(page) ? parseInt(page) : 1;
+  const limit = 5;
+  const skip = (pageToInt - 1) * limit;
   const files = await dbClient.fileCollection
     .find(
       {
@@ -216,8 +210,7 @@ const getFile: RequestHandler = async (req, res) => {
     res.status(404).json({error: 'Not found'});
     return;
   }
-  const decodedfileData = await fs.readFile(localPath);
-  const contents = Buffer.from(decodedfileData.toString('binary'), 'base64');
+  const contents = await fs.readFile(localPath);
   const mimeType = mime.lookup(file.name);
   res.type(mimeType || 'text/plain');
   res.status(200).end(contents);

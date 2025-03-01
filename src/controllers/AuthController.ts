@@ -54,7 +54,7 @@ const getDisconnect: RequestHandler = async (req, res) => {
   }
   await redisClient.remove(token);
   res.clearCookie('token');
-  res.status(204);
+  res.status(204).end();
 };
 
 const authMiddleware: RequestHandler = async (req, res, next) => {
@@ -65,7 +65,7 @@ const authMiddleware: RequestHandler = async (req, res, next) => {
   }
   const userId = await redisClient.get(token);
   if (!userId) {
-    res.status(404).json({error: 'Unauthorized'});
+    res.status(401).json({error: 'Unauthorized'});
     return;
   }
   res.locals.user = {id: userId, token};
